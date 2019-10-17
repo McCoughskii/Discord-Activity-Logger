@@ -3,6 +3,7 @@ const client = new Discord.Client();
 const config = require("./config.json");
 
 var Activities;
+var lastmsg;
 
 function getDate() {
 
@@ -35,12 +36,14 @@ function getTime() {
 
     if (hour > 12) {
         var newhour = hour - 12;
+    } else {
+        var newhour = hour;
     }
 
     var time = newhour + ":" + min;
 
     var ampm = function () {
-        if (hour > 12) {
+        if (hour >= 12) {
             return "PM";
         } else {
             return "AM";
@@ -51,72 +54,132 @@ function getTime() {
 }
 
 client.on('ready', () => {
-    console.log(`\nLogged in as ${client.user.tag}!
-Currently Apart Of ${client.guilds.size} Server/s
-Bot Started At: ${client.readyAt}`);
+    console.log(`\nLogged in as ${client.user.tag}!\nCurrently Apart Of ${client.guilds.size} Server/s\nBot Started At: ${client.readyAt}`);
+    client.user.setActivity(config.prefix + 'help', { type: 'WATCHING' }).then(presence => console.log(`Activity set to ${presence.game ? presence.game.name : 'none'}`))
+    .catch(console.error);
 });
+
+// log when joining a server
+client.on('guildCreate', guild => {
+    console.log(`Server Joined: ${guild.name}\nThis Server Has ${guild.memberCount} Member/s`);
+})
+
+// log when kicked from a server
+client.on('guildDelete', guild => {
+    console.log(`Server Left: ${guild.name}`);
+})
 
 client.on('message', message => {
 
-    if (!message.guild || message.author.bot) return; 
-    
+    if (!message.guild || message.author.bot) return;
+
     // We also stop processing if the message does not start with our prefix.
     if (message.content.indexOf(config.prefix) !== 0) return;
 
     //Then we use the config prefix to get our arguments and command:
     const args = message.content.split(/\s+/g);
     const command = args.shift().slice(config.prefix.length).toLowerCase();
+    
+    // find activity-logs channel
+    let activityChannelSend = message.guild.channels.find(ch => ch.name === config.logChannel);
 
-    let activityChannelSend = message.guild.channels.find(ch => ch.name === "activity-logs");
+    if (command === 'help') {
+
+        message.react('✅').then(message.delete(3000));
+
+        //message.delete().catch(console.error);
+
+        message.author.send({
+            "embed": {
+                "color": 6207911,
+                "timestamp": new Date(),
+                "footer": {
+                    "text": "This Message Will Be Deleted In 20 Seconds"
+                },
+                "title": "My Commands",
+                "fields": [{
+                        "name": "Clock In: " + "`" + config.prefix + "clockin" + "`",
+                        "value": "Clocks You In And Sends A Message To #activity-logs"
+                    },
+                    {
+                        "name": "Clock Out: " + "`" + config.prefix + "clockout <activites>" + "`",
+                        "value": "Clocks You Out And Sends A Message To #activity-logs With Your Activites"
+                    },
+                    {
+                        "name": "Help: " + "`" + config.prefix + "help" + "`",
+                        "value": "Shows This Message"
+                    }
+                ]
+            }
+        }).then(msg => {
+            msg.delete(20000)
+        }).catch(console.error());
+    }
 
     // clockin command
     if (command === 'clockin') {
 
-        if (message.guild.channels.find(ch => ch.name === "activity-logs") === null ){
-            message.guild.createChannel("activity-logs", "text");
+        message.delete().catch(console.error);
+
+        if (!message.guild.channels.exists(ch => ch.name === config.logChannel)) {
+            message.guild.createChannel(config.logChannel, "text");
             return message.reply("The Activity Log Channel Did Not Exist Please Try Again");
         }
 
-        message.channel.send("You Have Clocked In " + message.author);
+        console.log(`${message.author.tag} Has Clocked In On Server: ${message.guild.name}`);
+
+        // notify user that they have clocked In then deletes the message after 5 seconds
+        message.channel.send("You Have Successfully Clocked In, " + message.author).then(msg => {
+            msg.delete(5000)
+        }).catch(console.error);
 
         activityChannelSend.send({
             "embed": {
                 "color": 6207911,
                 "timestamp": new Date(),
                 "footer": {
-                    "icon_url": client.user.avatarURL,
-                    "text": "ImperialRP Activity Logger"
+                    "icon_url": 'https://discordapp.com/assets/0e291f67c9274a1abdddeb3fd919cbaa.png',
+                    "text": "Activity Logger"
                 },
                 "author": {
                     "name": message.author.tag,
-                    "icon_url": message.author.avatarURL,
+                    "icon_url": message.author.avatarURL
                 },
                 "title": "Clocked In",
                 "fields": [{
+                        "name": "User",
+                        "value": message.author.toString()
+                    },
+                    {
                         "name": "Date",
-                        "value": getDate(),
+                        "value": getDate()
                     },
                     {
                         "name": "Time",
-                        "value": getTime(),
+                        "value": getTime()
                     }
                 ]
             }
-        }).catch(console.error(error));
-
-        message.delete;
+        }).catch(console.error());
 
     }
 
     // clockout command
     if (command === 'clockout') {
 
-        if (!message.guild.channels.exists(ch => ch.name === "activity-logs")){
-            message.guild.createChannel("activity-logs", "text");
+        message.delete().catch(console.error);
+
+        if (!message.guild.channels.exists(ch => ch.name === config.logChannel)) {
+            message.guild.createChannel(config.logChannel, "text");
             return message.reply("The Activity Log Channel Did Not Exist Please Try Again");
         }
 
-        message.channel.send("You Have Clocked Out " + message.author);
+        console.log(`${message.author.tag} Has Clocked Out On Server ${message.guild.name}`);
+
+        // notify user that they have clocked out then delete after 5 seconds
+        message.channel.send("You Have Clocked Out, " + message.author).then(msg => {
+            msg.delete(5000)
+        }).catch(console.error);
 
         if (JSON.stringify(args) === "[]" || null) {
             Activities = "None Specified";
@@ -132,8 +195,8 @@ client.on('message', message => {
                 "color": 6207911,
                 "timestamp": new Date(),
                 "footer": {
-                    "icon_url": client.user.avatarURL,
-                    "text": "ImperialRP Activity Logger"
+                    "icon_url": 'https://discordapp.com/assets/0e291f67c9274a1abdddeb3fd919cbaa.png',
+                    "text": "Activity Logger"
                 },
                 "author": {
                     "name": message.author.tag,
@@ -141,25 +204,26 @@ client.on('message', message => {
                 },
                 "title": "Clocked Out",
                 "fields": [{
+                        "name": "User",
+                        "value": message.author.toString()
+                    },
+                    {
                         "name": "Date",
-                        "value": getDate(),
+                        "value": getDate()
                     },
                     {
                         "name": "Time",
-                        "value": getTime(),
+                        "value": getTime()
                     },
                     {
                         "name": "Activities",
-                        "value": Activities,
+                        "value": Activities
                     }
                 ]
             }
-        }).catch(console.error(error));
-
-        message.delete;
+        }).catch(console.error);
 
     }
-
 
 });
 

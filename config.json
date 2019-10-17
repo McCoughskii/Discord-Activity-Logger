@@ -1,4 +1,7 @@
 {
     "prefix": ".",
+    
+    "logChannel" : "activity-logs",
+
     "token": ""
 }
