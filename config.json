@@ -1,7 +1,8 @@
 {
     "prefix": ".",
     
-    "logChannel" : "activity-logs",
+    "activityChannel" : "activity-logs",
+    "loaChannel" : "loas",
 
     "token": ""
 }
